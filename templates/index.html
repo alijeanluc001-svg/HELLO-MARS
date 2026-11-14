@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HELLO HELLO — Mars Navigation</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Rajdhani:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='leaflet.css') }}"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--rust:#ff6a2a;--dust:#e8b98a;--ink:#0b0504}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--dust);font:500 15px Rajdhani,system-ui,sans-serif;overflow:hidden;height:100vh}
+#g{position:fixed;inset:0;width:100%;height:100%;cursor:grab}
+.fog{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 125%,rgba(255,106,42,.3),transparent 60%),radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(11,5,4,.9))}
+.scan{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);animation:fl 7s infinite}
+@keyframes fl{0%,95%,100%{opacity:1}96%{opacity:.3}97%{opacity:1}98%{opacity:.55}}
+header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:10px 16px;z-index:5}
+#logo{width:46px;height:46px;filter:drop-shadow(0 0 8px var(--rust))}
+h1{font:800 20px Orbitron,sans-serif;letter-spacing:.14em;color:#fff;text-shadow:0 0 14px var(--rust)}
+header p{font-size:12px;letter-spacing:.4em;color:var(--rust)}
+.sp{flex:1}#facts{font-size:12px;opacity:.75;text-align:right}
+select,button{font:inherit;color:var(--dust);background:rgba(30,12,7,.88);border:1px solid #5a2a18;padding:7px 10px;transition:.2s;min-width:0}
+button{cursor:pointer}
+select:hover,button:hover:not(:disabled){border-color:var(--rust);box-shadow:0 0 14px rgba(255,106,42,.5);color:#fff}
+:focus-visible{outline:2px solid #4de1ff;outline-offset:2px}
+.pnl{background:rgba(18,7,4,.76);backdrop-filter:blur(6px);border-left:2px solid var(--rust);padding:12px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+#panel{position:fixed;top:74px;left:16px;width:280px;display:grid;gap:8px;z-index:4}
+.row{display:grid;grid-template-columns:104px 1fr;gap:6px;align-items:center}
+.pk.on{background:var(--rust);color:#120503;border-color:var(--rust);box-shadow:0 0 16px var(--rust)}
+#go{background:linear-gradient(90deg,#ff6a2a,#ff3d1f);color:#120503;border:0;font:800 14px Orbitron,sans-serif;letter-spacing:.12em;padding:11px}
+#go:hover:not(:disabled){color:#fff;transform:scale(1.02)}
+small,.sm{font-size:12px;opacity:.7}
+#out{position:fixed;right:16px;top:74px;bottom:16px;width:340px;overflow:auto;display:grid;gap:8px;align-content:start;z-index:4}
+.card{border-left:3px solid var(--c);background:rgba(18,7,4,.8);padding:10px 12px;cursor:pointer;transition:.25s}
+.card:hover,.card.on{transform:translateX(-6px);box-shadow:0 0 20px -4px var(--c);background:rgba(44,16,9,.92)}
+.ct{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ct b{font:800 15px Orbitron,sans-serif;letter-spacing:.1em;color:var(--c,#fff)}
+.ct span{font:800 18px Orbitron,sans-serif;color:#fff}
+.bar{height:4px;background:#2a1008;margin:8px 0}.bar i{display:block;height:100%;background:linear-gradient(90deg,#7dffa1,#fff25a,#ff3b3b);background-size:340px 100%;transition:width .8s}
+.mt{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+em{display:block;color:#ff6a6a;font-size:13px;margin-top:4px}
+#hz p{font-size:14px;padding:2px 0}
+#alert{position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:6;padding:10px 20px;font:800 13px Orbitron,sans-serif;letter-spacing:.06em;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;max-width:min(520px,90vw)}
+#alert.on{opacity:1}#alert.warn{background:#6b1208;color:#ffd2c4;box-shadow:0 0 26px #ff3d1f}#alert.ok{background:#0e4a2a;color:#cfffe0;box-shadow:0 0 26px #7dffa1}
+#tip{position:fixed;z-index:7;pointer-events:none;background:rgba(11,5,4,.92);border:1px solid var(--rust);padding:6px 10px;font-size:13px;white-space:pre;opacity:0;transition:opacity .15s}
+#cm{position:fixed;inset:0;z-index:15;background:rgba(11,5,4,.88);display:grid;place-items:center}
+#cm[hidden]{display:none}#cm .pnl{max-width:560px;font-size:14px;line-height:1.5}
+#boot{position:fixed;inset:0;z-index:20;background:var(--ink);display:grid;place-content:center;gap:6px;font:500 13px/1.8 Orbitron,sans-serif;color:var(--rust);letter-spacing:.2em;transition:opacity .9s}
+#boot.off{opacity:0;pointer-events:none}
+#boot div{opacity:0;animation:b .5s forwards}#boot div:nth-child(2){animation-delay:.5s}#boot div:nth-child(3){animation-delay:1s}#boot div:nth-child(4){animation-delay:1.5s}
+@keyframes b{to{opacity:1}}
+@media(max-width:820px){ #facts{display:none}#panel{width:calc(100% - 32px);top:64px}#out{top:auto;left:16px;width:calc(100% - 32px);height:40vh}}
+@media(prefers-reduced-motion:reduce){.scan{animation:none}*{transition:none!important}}
+#boot{pointer-events:none}
+#map{position:fixed;inset:0;display:none;background:#1a0a06}.leaflet-container{font:inherit}
+.leaflet-tooltip{background:#12070a;color:#e8b98a;border:1px solid #ff6a2a}
+@media print{ body{overflow:visible;height:auto;background:#fff;color:#000} #g,#map,.fog,.scan,header,#panel,#boot,#tip,#alert{display:none} #out{position:static;width:auto} .card,.pnl{background:#fff;color:#000;clip-path:none;border:1px solid #000;margin:4px 0;break-inside:avoid} .ct b,.ct span{color:#000} #pl{display:none}}
+</style></head><body>
+<canvas id="g"></canvas><div id="map"></div><div class="fog"></div><div class="scan"></div>
+<header>
+<svg id="logo" viewBox="0 0 48 48" aria-label="logo"><defs><radialGradient id="lg" cx=".35" cy=".3"><stop offset="0" stop-color="#ffb27a"/><stop offset=".6" stop-color="#ff6a2a"/><stop offset="1" stop-color="#5a1a0a"/></radialGradient></defs><circle cx="24" cy="26" r="13" fill="url(#lg)"/><path d="M2 32A24 8-20 0 1 46 20" fill="none" stroke="#7fe9ff" stroke-width="1.6"/><path d="M8 20A18 18 0 0 1 24 5M12 24A14 14 0 0 1 24 10" fill="none" stroke="#e8b98a" stroke-width="1.4" stroke-linecap="round"/><path d="M24 24l3.5 9-3.5-2.4-3.5 2.4z" fill="#0b0504"/></svg>
+<div><h1>HELLO HELLO</h1><p>Mars Navigation</p></div><div class="sp"></div><span id="facts"></span>
+<button id="md" title="2D / 3D">2D</button><button id="sd" title="sound">🔇</button><button id="pr" title="PDF">🖨</button><select id="lang" aria-label="language"></select><button id="cr"></button>
+</header>
+<aside id="panel" class="pnl">
+<div class="row"><button class="pk on" id="bs"></button><select id="ss"></select></div>
+<div class="row"><button class="pk" id="be"></button><select id="se"></select></div>
+<div class="row"><span id="lv"></span><select id="vh"></select></div>
+<div class="row"><span id="le"></span><select id="ef"></select></div>
+<button id="go"></button><small id="hint"></small>
+</aside>
+<main id="out"><div id="cards"></div><div id="hz"></div></main>
+<div id="alert" role="status"></div><div id="tip"></div>
+<div id="cm" hidden><div class="pnl"><b>HELLO HELLO — Mars Navigation</b><br>NASA/JPL-Caltech, USGS Astrogeology (Viking MDIM 2.1, MOLA, CTX, HiRISE via NASA Trek) ; ESA (ExoMars) ; CNSA (Tianwen-1). Constantes : NASA Mars Fact Sheet. Radiation : instrument RAD (Curiosity). Three.js (MIT). <br><br><button id="cx">OK</button></div></div>
+<div id="boot"><div>HELLO HELLO // MARS NAVIGATION</div><div>&gt; LINK ORBITAL ... OK</div><div>&gt; SITES D'ATTERRISSAGE ... OK</div><div>&gt; CAP SUR MARS</div></div>
+<script src="{{ url_for('static', filename='three.min.js') }}"></script>
+<script>window.THREE||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')</script>
+<script>window.THREE||document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>')</script>
+<script src="{{ url_for('static', filename='leaflet.js') }}"></script>
+<script>window.L||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"><\/script>')</script>
+<script>
+(function(){
+const LF=window.L,TILE='https://trek.nasa.gov/tiles/Mars/EQ/Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg',TMOLA='https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg';
+const bt=document.getElementById('boot'),al=document.getElementById('alert');setTimeout(()=>bt.classList.add('off'),2300);
+window.onerror=m=>{bt.classList.add('off');al.textContent='⚠ '+m;al.className='on warn'};
+if(!window.THREE){bt.classList.add('off');al.textContent='three.min.js introuvable : copie-le dans static/';al.className='on warn';return}
+const K='from to veh eff go foot rover e0 e1 e2 time o2 water dose haz play arrive away range credits hint sim'.split(' ');
+const L={
+fr:['Position','Cible','Véhicule','Effort','CALCULER','À pied','Rover','Léger','Modéré','Intense','Durée','O₂ (+30 %)','Eau','Radiation','Dangers','▶ Simuler','Destination atteinte ! Bravo, astronaute.','Alerte : vous vous éloignez de la cible (contournement).','Hors de portée de l’équipement','Crédits','Clique sur le globe ou un site pour choisir','Relief simulé : brancher MOLA/HiRISE pour le réel'],
+en:['Position','Target','Vehicle','Effort','COMPUTE','On foot','Rover','Light','Moderate','Intense','Duration','O₂ (+30%)','Water','Radiation','Hazards','▶ Simulate','Destination reached! Well done, astronaut.','Warning: moving away from target (detour).','Beyond equipment range','Credits','Click the globe or a site to pick','Simulated terrain: plug MOLA/HiRISE for real data'],
+es:['Posición','Objetivo','Vehículo','Esfuerzo','CALCULAR','A pie','Rover','Ligero','Moderado','Intenso','Duración','O₂ (+30 %)','Agua','Radiación','Peligros','▶ Simular','¡Destino alcanzado! Bien hecho, astronauta.','Alerta: te alejas del objetivo (desvío).','Fuera del alcance del equipo','Créditos','Pulsa el globo o un sitio para elegir','Relieve simulado: conectar MOLA/HiRISE para datos reales'],
+pt:['Posição','Alvo','Veículo','Esforço','CALCULAR','A pé','Rover','Leve','Moderado','Intenso','Duração','O₂ (+30 %)','Água','Radiação','Perigos','▶ Simular','Destino alcançado! Bom trabalho, astronauta.','Alerta: afastando-se do alvo (desvio).','Fora do alcance do equipamento','Créditos','Clique no globo ou num local para escolher','Relevo simulado: ligar MOLA/HiRISE para dados reais'],
+de:['Position','Ziel','Fahrzeug','Belastung','BERECHNEN','Zu Fuß','Rover','Leicht','Mäßig','Intensiv','Dauer','O₂ (+30 %)','Wasser','Strahlung','Gefahren','▶ Simulieren','Ziel erreicht! Gut gemacht, Astronaut.','Warnung: Sie entfernen sich vom Ziel (Umweg).','Außerhalb der Ausrüstungsreichweite','Quellen','Globus oder Ort anklicken','Simuliertes Gelände: MOLA/HiRISE anbinden für echte Daten'],
+ar:['الموقع','الهدف','المركبة','الجهد','احسب','مشيًا','مركبة','خفيف','متوسط','شديد','المدة','الأكسجين (+30٪)','الماء','الإشعاع','المخاطر','▶ محاكاة','تم الوصول إلى الوجهة! أحسنت أيها رائد الفضاء.','تنبيه: أنت تبتعد عن الهدف (مسار التفافي).','خارج نطاق المعدات','المصادر','انقر على الكرة أو موقع للاختيار','تضاريس محاكاة: اربط MOLA/HiRISE لبيانات حقيقية'],
+hi:['स्थिति','लक्ष्य','वाहन','श्रम','गणना करें','पैदल','रोवर','हल्का','मध्यम','तीव्र','अवधि','ऑक्सीजन (+30%)','पानी','विकिरण','खतरे','▶ सिमुलेट','गंतव्य पहुँच गया! शाबाश अंतरिक्ष यात्री।','चेतावनी: आप लक्ष्य से दूर जा रहे हैं (चक्कर)।','उपकरण की सीमा से बाहर','श्रेय','चुनने के लिए ग्लोब या स्थल पर क्लिक करें','सिम्युलेटेड भू-भाग: असली डेटा के लिए MOLA/HiRISE जोड़ें']};
+const NM={fr:'Français',en:'English',es:'Español',pt:'Português',de:'Deutsch',ar:'العربية',hi:'हिन्दी'};
+const COL={sentinel:'#4de1ff',discovery:'#c67bff',fortress:'#7dffa1',sprint:'#fff25a'},IC={SLOPE:'⛰',ROCKS:'🪨',DUNES:'🌪',CLIFF:'🕳'};
+const $=s=>document.querySelector(s);
+let lang=(navigator.language||'fr').slice(0,2);if(!L[lang])lang='fr';
+const T=k=>L[lang][K.indexOf(k)];
+let S=[],M={},st={s:null,e:null,R:null,act:'sentinel'},A=null,rep=null,idle=0,hov=null,pk='s',tm,mp=null,mm=null,is2=false,snd=false,ac;
+
+// ---------- scène 3D ----------
+const cv=$('#g'),rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true}),sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,1,.1,50),G=new THREE.Group();
+cam.position.z=3.6;const sun=new THREE.DirectionalLight(0xffe2c8,1.25);sun.position.set(3,2,4);sc.add(G,new THREE.AmbientLight(0x7a4a3a,1),sun);
+function proc(){const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');x.fillStyle='#8c3d1d';x.fillRect(0,0,1024,512);let s=7;const r=()=>(s=s*16807%2147483647)/2147483647;
+for(let i=0;i<2500;i++){x.fillStyle=`rgba(${90+r()*110|0},${30+r()*50|0},${10+r()*30|0},.18)`;x.beginPath();x.arc(r()*1024,r()*512,2+r()*26,0,7);x.fill()}
+const g=x.createLinearGradient(0,0,0,512);[[0,.85],[.07,0],[.93,0],[1,.85]].forEach(a=>g.addColorStop(a[0],`rgba(255,255,255,${a[1]})`));x.fillStyle=g;x.fillRect(0,0,1024,512);return new THREE.CanvasTexture(c)}
+const globe=new THREE.Mesh(new THREE.SphereGeometry(1,96,64),new THREE.MeshPhongMaterial({map:proc(),shininess:3}));G.add(globe);
+// texture réelle (équirectangulaire, centrée sur 0°) : déposer static/mars.jpg
+new THREE.TextureLoader().load("{{ url_for('static', filename='mars.jpg') }}",t=>{globe.material.map=t;globe.material.needsUpdate=true},undefined,()=>{});
+sc.add(new THREE.Mesh(new THREE.SphereGeometry(1.07,48,32),new THREE.MeshBasicMaterial({color:0xff7a3a,transparent:true,opacity:.13,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false})));
+const dp=[];for(let i=0;i<450;i++){const v=new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(1.12+Math.random()*1.4);dp.push(v)}
+const dust=new THREE.Points(new THREE.BufferGeometry().setFromPoints(dp),new THREE.PointsMaterial({color:0xe8b98a,size:.012,transparent:true,opacity:.5}));sc.add(dust);
+const ll=(la,lo,r)=>{const p=(90-la)*Math.PI/180,t=(lo+180)*Math.PI/180;return new THREE.Vector3(-r*Math.sin(p)*Math.cos(t),r*Math.cos(p),r*Math.sin(p)*Math.sin(t))};
+const Z=new THREE.Vector3(0,0,1),RT=new THREE.Group();G.add(RT);
+const qFor=v=>new THREE.Quaternion().setFromUnitVectors(v.clone().normalize(),Z);
+const ring=c=>{const m=new THREE.Mesh(new THREE.RingGeometry(.02,.027,40),new THREE.MeshBasicMaterial({color:c,side:THREE.DoubleSide,transparent:true}));m.visible=false;G.add(m);return m};
+const RG={s:ring(0x4de1ff),e:ring(0xff6a2a)},mover=new THREE.Mesh(new THREE.SphereGeometry(.014,16,12),new THREE.MeshBasicMaterial({color:0xffffff}));mover.visible=false;G.add(mover);
+const marks=[],TC={landing:0xffb27a,future:0x4de1ff,landmark:0xffe9c9};
+
+function fly(la,lo,z){if(is2){mp.flyTo([la,LO(lo)],z<2?5:z<3?3:2,{duration:1.4});return}const p=ll(la,lo,1),f=Z.clone().applyQuaternion(G.quaternion.clone().invert()),a=f.angleTo(p);A={q0:G.quaternion.clone(),q1:qFor(p),t0:performance.now(),d:(.8+2.2*Math.min(1,a/Math.PI))*1000,z0:cam.position.z,z1:z}}
+function say(t,c,ms){bp(c=='warn'?180:880);const a=$('#alert');a.textContent=t;a.className='on '+c;clearTimeout(tm);if(ms)tm=setTimeout(()=>a.className='',ms)}
+function setPick(w){pk=w;$('#bs').classList.toggle('on',w=='s');$('#be').classList.toggle('on',w=='e')}
+function setPt(w,p,go_){st[w]=p;const sel=w=='s'?$('#ss'):$('#se'),i=S.findIndex(x=>x.id==p.id);sel.value=i<0?'':p.id;if(i<0)sel.options[0].textContent=p.lat.toFixed(2)+'°, '+p.lon.toFixed(2)+'°';
+const r=RG[w];r.visible=true;r.position.copy(ll(p.lat,p.lon,1.006));r.quaternion.setFromUnitVectors(Z,r.position.clone().normalize());upd2();bp(700);if(go_!==0)fly(p.lat,p.lon,1.9);if(w=='s')setPick('e')}
+
+// ---------- interactions ----------
+const rc=new THREE.Raycaster(),nd=new THREE.Vector2();let dn=null;
+const ray=e=>{const b=cv.getBoundingClientRect();nd.set((e.clientX-b.left)/b.width*2-1,-((e.clientY-b.top)/b.height*2-1));rc.setFromCamera(nd,cam)};
+cv.addEventListener('pointerdown',e=>{dn={x:e.clientX,y:e.clientY,m:0};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing'});
+cv.addEventListener('pointermove',e=>{idle=0;const tp=$('#tip');
+if(dn){const dx=e.clientX-dn.x,dy=e.clientY-dn.y;dn.m+=Math.abs(dx)+Math.abs(dy);dn.x=e.clientX;dn.y=e.clientY;if(dn.m>4){A=null;rep=null;G.quaternion.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(dy*.005,dx*.005,0)))}tp.style.opacity=0;return}
+ray(e);const h=rc.intersectObjects(marks)[0];hov=h?h.object:null;cv.style.cursor=h?'pointer':'grab';
+if(h){const s=h.object.userData;tp.textContent=s.name+' — '+s.mission+'\n'+s.lat.toFixed(2)+'°, '+s.lon.toFixed(2)+'°';tp.style.left=e.clientX+14+'px';tp.style.top=e.clientY+14+'px';tp.style.opacity=1}else tp.style.opacity=0});
+cv.addEventListener('pointerup',e=>{cv.style.cursor='grab';if(!dn||dn.m>4){dn=null;return}dn=null;ray(e);const h=rc.intersectObjects(marks)[0];
+if(h){setPt(pk,h.object.userData);return}const g=rc.intersectObject(globe)[0];if(!g)return;const v=G.worldToLocal(g.point.clone()),la=90-Math.acos(Math.max(-1,Math.min(1,v.y)))*180/Math.PI,lo=((Math.atan2(v.z,-v.x)*180/Math.PI-180)%360+360)%360;
+setPt(pk,{id:'',name:'',mission:'',lat:la,lon:lo})});
+cv.addEventListener('wheel',e=>{e.preventDefault();cam.position.z=Math.max(1.35,Math.min(5,cam.position.z*(1+e.deltaY*.001)));A=null},{passive:false});
+$('#bs').onclick=()=>setPick('s');$('#be').onclick=()=>setPick('e');
+$('#ss').onchange=e=>{const s=S.find(x=>x.id==e.target.value);if(s)setPt('s',s)};$('#se').onchange=e=>{const s=S.find(x=>x.id==e.target.value);if(s)setPt('e',s)};
+$('#go').onclick=go;$('#cr').onclick=()=>$('#cm').hidden=false;$('#cx').onclick=()=>$('#cm').hidden=true;
+$('#lang').onchange=e=>{lang=e.target.value;applyLang();if(st.R)draw()};
+$('#out').addEventListener('click',e=>{const c=e.target.closest('.card'),p=e.target.closest('#pl');if(p){play();return}if(c){st.act=c.dataset.k;draw()}});
+
+// ---------- calcul & affichage ----------
+async function go(){if(!st.s||!st.e)return;$('#go').disabled=true;rep=null;
+try{st.R=await fetch('/api/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:[st.s.lat,st.s.lon],end:[st.e.lat,st.e.lon],veh:+$('#vh').value,eff:+$('#ef').value})}).then(r=>r.json())}catch(x){say('API ?','warn',3000)}
+$('#go').disabled=false;if(!st.R)return;draw();if(is2){mp.fitBounds(st.R[st.act].path.map(p=>[p[0],LO(p[1])]),{padding:[80,80]});return}const a=ll(st.s.lat,st.s.lon,1),b=ll(st.e.lat,st.e.lon,1),m=a.clone().add(b).normalize(),la=90-Math.acos(m.y)*180/Math.PI;
+fly(la,Math.atan2(m.z,-m.x)*180/Math.PI-180,1.7+2.3*Math.min(1,a.angleTo(b)/Math.PI*1.3))}
+const ft=h=>h<1?Math.round(h*60)+' min':h<72?h.toFixed(1)+' h':(h/24).toFixed(1)+' d';
+function draw(){const R=st.R;while(RT.children.length)RT.remove(RT.children[0]);
+for(const k in COL){const pts=R[k].path.map(p=>ll(p[0],p[1],1.012)),on=k==st.act;[1,1.5].forEach((z,i)=>{if(i&&!on)return;RT.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(v=>v.clone().multiplyScalar(i?1.004:1))),new THREE.LineBasicMaterial({color:COL[k],transparent:true,opacity:on?1:.3})))})}
+$('#cards').innerHTML=Object.keys(COL).map(k=>{const r=R[k];return`<div class="card${k==st.act?' on':''}" data-k="${k}" style="--c:${COL[k]}"><div class="ct"><b>${k.toUpperCase()}</b><span>${r.km} km</span></div><div class="bar" title="${r.risk}%"><i style="width:${r.risk}%"></i></div><div class="mt"><span title="${T('time')}">⏱ ${ft(r.h)} ±${r.unc}%</span><span title="${T('o2')}">O₂ ${r.o2} kg</span><span title="${T('water')}">💧 ${r.water} L</span><span title="${T('dose')}">☢ ${r.msv} mSv</span><span title="${T('haz')}">⚠ ${r.haz.length}</span><span>${r.risk}%</span></div>${r.ok?'':`<em>${T('range')}</em>`}</div>`}).join('');
+const a=R[st.act];$('#hz').innerHTML=`<div class="pnl"><div class="ct"><b>${T('haz')}</b><button id="pl">${T('play')}</button></div>${a.haz.map(h=>`<p>${IC[h.type]} ${h.type} · km ${h.km} · ${h.sev}%</p>`).join('')}<p class="sm">${T('sim')}</p></div>`;upd2()}
+function play(){const r=st.R&&st.R[st.act];if(!r)return;if(is2)$('#md').click();rep={P:r.path.map(p=>ll(p[0],p[1],1.02)),H:r.haz,t0:performance.now(),D:9000,i:-1};mover.visible=true;cam.position.z=1.7}
+function applyLang(){document.documentElement.lang=lang;document.dir=lang=='ar'?'rtl':'ltr';$('#bs').textContent='📍 '+T('from');$('#be').textContent='🎯 '+T('to');$('#lv').textContent=T('veh');$('#le').textContent=T('eff');$('#go').textContent=T('go');$('#hint').textContent=T('hint');$('#cr').textContent=T('credits');
+const v=$('#vh').value||1,e=$('#ef').value||1;$('#vh').innerHTML=['foot','rover'].map((k,i)=>`<option value="${i}">${T(k)}</option>`).join('');$('#ef').innerHTML=['e0','e1','e2'].map((k,i)=>`<option value="${i}">${T(k)}</option>`).join('');$('#vh').value=v;$('#ef').value=e}
+
+// ---------- carte 2D (tuiles NASA Trek, zoom détaillé) ----------
+const LO=l=>l>180?l-360:l;
+function map2(){if(mp||!LF)return;
+mp=LF.map('map',{crs:LF.CRS.EPSG4326,center:[0,0],zoom:2,minZoom:0,maxZoom:9,maxBounds:[[-90,-180],[90,180]]});
+const o={tileSize:256,maxNativeZoom:7,noWrap:true,errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',attribution:'NASA/JPL · USGS Astrogeology · Viking MDIM 2.1 · MOLA'};
+LF.tileLayer('/static/tiles/{z}/{y}/{x}.jpg',o).addTo(mp);
+const vk=LF.tileLayer(TILE,o).addTo(mp),mo=LF.tileLayer(TMOLA,Object.assign({},o,{maxNativeZoom:6}));
+LF.control.layers({'Viking MDIM 2.1':vk,'MOLA altimétrie':mo},null,{collapsed:true}).addTo(mp);
+mm=LF.layerGroup().addTo(mp);
+S.forEach(s=>LF.circleMarker([s.lat,LO(s.lon)],{radius:7,weight:2,color:'#ff6a2a',fillColor:'#'+TC[s.type].toString(16).padStart(6,'0'),fillOpacity:.9,bubblingMouseEvents:false}).bindTooltip(s.name+' — '+s.mission).on('click',()=>setPt(pk,s)).addTo(mp));
+mp.on('click',e=>setPt(pk,{id:'',name:'',mission:'',lat:e.latlng.lat,lon:(e.latlng.lng+360)%360}))}
+function upd2(){if(!mp)return;mm.clearLayers();const R=st.R;
+if(R)for(const k in COL){const on=k==st.act;LF.polyline(R[k].path.map(p=>[p[0],LO(p[1])]),{color:COL[k],weight:on?5:2,opacity:on?1:.45,interactive:false}).addTo(mm)}
+[['s','#4de1ff'],['e','#ff6a2a']].forEach(a=>{const p=st[a[0]];if(p)LF.circleMarker([p.lat,LO(p.lon)],{radius:13,color:a[1],weight:3,fill:false,interactive:false}).addTo(mm)})}
+$('#md').onclick=()=>{is2=!is2;$('#md').textContent=is2?'3D':'2D';$('#map').style.display=is2?'block':'none';cv.style.visibility=is2?'hidden':'visible';
+if(is2){map2();setTimeout(()=>{mp.invalidateSize();upd2();const p=st.s;if(p)mp.setView([p.lat,LO(p.lon)],3)},60)}};
+if(!LF)$('#md').hidden=true;
+// ---------- son & export ----------
+const AC=window.AudioContext||window.webkitAudioContext;
+function bp(f){if(!snd||!AC)return;ac=ac||new AC();const o=ac.createOscillator(),g=ac.createGain();o.type='square';o.frequency.value=f;g.gain.value=.03;o.connect(g);g.connect(ac.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.12);o.stop(ac.currentTime+.13)}
+$('#sd').onclick=()=>{snd=!snd;$('#sd').textContent=snd?'🔊':'🔇';bp(660)};$('#pr').onclick=()=>window.print();
+// ---------- boucle ----------
+function tick(now){requestAnimationFrame(tick);idle+=1;
+if(A){const k=Math.min(1,(now-A.t0)/A.d),e=k<.5?2*k*k:1-2*(1-k)*(1-k);G.quaternion.copy(A.q0).slerp(A.q1,e);cam.position.z=A.z0+(A.z1-A.z0)*e;if(k>=1)A=null}
+else if(rep){const k=Math.min(1,(now-rep.t0)/rep.D),f=k*(rep.P.length-1),i=Math.min(Math.floor(f),rep.P.length-2),v=rep.P[i].clone().lerp(rep.P[i+1],f-i).normalize().multiplyScalar(1.02);mover.position.copy(v);G.quaternion.slerp(qFor(v),.08);
+if(i!=rep.i){rep.i=i;const h=rep.H.find(x=>x.i==i),e=ll(st.e.lat,st.e.lon,1);if(h)say('⚠ '+IC[h.type]+' '+h.type+' '+h.sev+'%','warn',2500);else if(i>0&&rep.P[i].angleTo(e)>rep.P[i-1].angleTo(e))say(T('away'),'warn',2500)}
+if(k>=1){say(T('arrive'),'ok',0);rep=null;mover.visible=false}}
+else if(idle>240)G.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),.0006));
+const p=1+.35*Math.sin(now/280);RG.s.scale.setScalar(p);RG.e.scale.setScalar(p);dust.rotation.y+=.0002;
+marks.forEach(m=>{const t=m===hov?2.2:1;m.scale.x+=(t-m.scale.x)*.2;m.scale.setScalar(m.scale.x)});
+const b=cv.getBoundingClientRect();if(cv.width!=b.width*rd.getPixelRatio()){rd.setPixelRatio(Math.min(devicePixelRatio,2));rd.setSize(b.width,b.height,false);cam.aspect=b.width/b.height;cam.updateProjectionMatrix()}
+rd.render(sc,cam)}
+
+// ---------- init ----------
+fetch('/api/sites').then(r=>r.json()).then(d=>{S=d.sites;M=d.mars;
+$('#facts').textContent=`R ${M.radius_km} km · ${M.area_mkm2} M km² · g ${M.gravity} m/s² · ${M.temp_c} °C · radio ${M.delay_min[0]}–${M.delay_min[1]} min`;
+$('#lang').innerHTML=Object.keys(NM).map(k=>`<option value="${k}"${k==lang?' selected':''}>${NM[k]}</option>`).join('');
+const opts='<option value="">—</option>'+S.map(s=>`<option value="${s.id}">${s.name} · ${s.mission}</option>`).join('');$('#ss').innerHTML=opts;$('#se').innerHTML=opts;
+S.forEach(s=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.011,16,12),new THREE.MeshBasicMaterial({color:TC[s.type]}));m.position.copy(ll(s.lat,s.lon,1.005));m.userData=s;G.add(m);marks.push(m)});
+applyLang();G.quaternion.copy(qFor(ll(0,136,1)));
+setTimeout(()=>{setPt('s',S[1],0);setPt('e',S[2],0);go()},2300)}).catch(e=>say('API /api/sites : '+e,'warn',0));
+requestAnimationFrame(tick);
+})();
+</script></body></html>
